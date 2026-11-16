@@ -19,9 +19,9 @@ public interface ModuleIO {
 
     public SwerveModulePosition getPosition();
 
-    public SwerveModuleVelocity getState();
+    public SwerveModuleVelocity getVelocity();
 
-    public void setStates(SwerveModuleVelocity velocities);
+    public void setVelocities(SwerveModuleVelocity velocities);
 
 
 

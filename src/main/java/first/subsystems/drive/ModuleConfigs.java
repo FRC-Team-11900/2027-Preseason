@@ -58,6 +58,13 @@ public class ModuleConfigs {
         new CANBus(CANPort.CAN_D0)
     );
 
+    public static ModuleIDs[] drivetrainIDs = {
+        frontLeftIDs,
+        frontRightIDs,
+        backLeftIDs,
+        backRightIDs
+    };
+
     
 
     public ModuleConfigs() {}

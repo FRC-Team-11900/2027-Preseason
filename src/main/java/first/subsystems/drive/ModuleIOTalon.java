@@ -150,12 +150,12 @@ public class ModuleIOTalon implements ModuleIO {
     }
 
     @Override
-    public SwerveModuleVelocity getState() {
+    public SwerveModuleVelocity getVelocity() {
         return new SwerveModuleVelocity(getDriveVelocity(), getSteerPosition());
     }
 
     @Override
-    public void setStates(SwerveModuleVelocity velocities) {
+    public void setVelocities(SwerveModuleVelocity velocities) {
         Rotation2d nowRotation2d = getSteerPosition();
         boolean isStoped = Math.abs(velocities.velocity) <= 0.01;
         velocities = velocities.optimize(nowRotation2d);
