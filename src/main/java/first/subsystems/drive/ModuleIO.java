@@ -23,6 +23,6 @@ public interface ModuleIO {
 
     public void setVelocities(SwerveModuleVelocity velocities);
 
-
+    public void refreshAll();
 
 }

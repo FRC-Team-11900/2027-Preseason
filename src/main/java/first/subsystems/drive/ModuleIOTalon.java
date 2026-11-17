@@ -1,7 +1,6 @@
 package first.subsystems.drive;
 
 import static org.wpilib.units.Units.Amps;
-import static org.wpilib.units.Units.Meter;
 import static org.wpilib.units.Units.Meters;
 import static org.wpilib.units.Units.MetersPerSecond;
 
@@ -13,10 +12,12 @@ import org.wpilib.units.measure.AngularVelocity;
 import org.wpilib.units.measure.Distance;
 import org.wpilib.units.measure.LinearVelocity;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -38,9 +39,11 @@ public class ModuleIOTalon implements ModuleIO {
     private final VelocityVoltage driveOutput;
     private final PositionVoltage steerOutput;
 
+    private final NeutralOut neutralOutput;
+
     private final ModuleIDs IDs;
     private final ModuleConstants constants;
-    
+
     public ModuleIOTalon(ModuleIDs IDs, ModuleConstants constants) {
 
         this.IDs = IDs;
@@ -54,12 +57,14 @@ public class ModuleIOTalon implements ModuleIO {
         this.drivePosition = this.driveMotor.getPosition();
         this.steerPosition = this.steerMotor.getPosition();
         this.absolutePosition = this.absoluteEncoder.getAbsolutePosition();
-        
+
         this.driveVelocity = driveMotor.getVelocity();
         this.steerVelocity = steerMotor.getVelocity();
 
         this.driveOutput = new VelocityVoltage(0.0);
         this.steerOutput = new PositionVoltage(0.0);
+
+        this.neutralOutput = new NeutralOut();
 
         configure();
     }
@@ -74,7 +79,9 @@ public class ModuleIOTalon implements ModuleIO {
 
         driveConfigs.CurrentLimits
                 .withStatorCurrentLimit(Amps.of(60))
-                .withSupplyCurrentLimit(Amps.of(30))
+                .withSupplyCurrentLimit(Amps.of(40))
+                .withSupplyCurrentLowerLimit(Amps.of(30))
+                .withSupplyCurrentLowerTime(1.0)
                 .withStatorCurrentLimitEnable(true)
                 .withSupplyCurrentLimitEnable(true);
         driveConfigs.Feedback
@@ -91,8 +98,8 @@ public class ModuleIOTalon implements ModuleIO {
                 .withInverted(InvertedValue.Clockwise_Positive)
                 .withNeutralMode(NeutralModeValue.Brake);
         steerConfigs.CurrentLimits
-                .withStatorCurrentLimit(60)
-                .withSupplyCurrentLimit(30)
+                .withStatorCurrentLimit(30)
+                .withSupplyCurrentLimit(15)
                 .withStatorCurrentLimitEnable(true)
                 .withSupplyCurrentLimitEnable(true);
         steerConfigs.Feedback
@@ -110,7 +117,7 @@ public class ModuleIOTalon implements ModuleIO {
 
         this.driveMotor.getConfigurator().apply(driveConfigs);
         this.steerMotor.getConfigurator().apply(steerConfigs);
-        
+
         this.absolutePosition.waitForUpdate(0.25);
 
         if (!this.absolutePosition.getStatus().isOK()) {
@@ -122,25 +129,22 @@ public class ModuleIOTalon implements ModuleIO {
 
     @Override
     public Distance getDrivePosition() {
-        this.drivePosition.refresh();
         return Meters.of(this.drivePosition.getValueAsDouble() * this.constants.wheelDiameter().in(Meters) * Math.PI);
     }
 
     @Override
     public LinearVelocity getDriveVelocity() {
-        this.driveVelocity.refresh();
-        return MetersPerSecond.of(this.driveVelocity.getValueAsDouble() * this.constants.wheelDiameter().in(Meters) * Math.PI);
+        return MetersPerSecond
+                .of(this.driveVelocity.getValueAsDouble() * this.constants.wheelDiameter().in(Meters) * Math.PI);
     }
 
     @Override
     public Rotation2d getSteerPosition() {
-        this.steerPosition.refresh();
         return new Rotation2d(this.steerPosition.getValue());
     }
 
     @Override
     public AngularVelocity getSteerVelocity() {
-        this.steerVelocity.refresh();
         return this.steerVelocity.getValue();
     }
 
@@ -157,11 +161,28 @@ public class ModuleIOTalon implements ModuleIO {
     @Override
     public void setVelocities(SwerveModuleVelocity velocities) {
         Rotation2d nowRotation2d = getSteerPosition();
-        boolean isStoped = Math.abs(velocities.velocity) <= 0.01;
+        boolean isStopped = Math.abs(velocities.velocity) <= 0.01;
         velocities = velocities.optimize(nowRotation2d);
         velocities = velocities.cosineScale(nowRotation2d);
 
-        this.driveMotor.setControl(this.driveOutput.withVelocity(velocities.velocity / (this.constants.wheelDiameter().in(Meter) * Math.PI)));
-        this.steerMotor.setControl(this.steerOutput.withPosition(isStoped ? nowRotation2d.getRotations() : velocities.angle.getRotations()));
+        if (isStopped) {
+            steerMotor.setControl(neutralOutput);
+            driveMotor.setControl(neutralOutput);
+            return;
+        }
+
+        this.driveMotor.setControl(this.driveOutput
+                .withVelocity(velocities.velocity / (this.constants.wheelDiameter().in(Meters) * Math.PI)));
+        this.steerMotor.setControl(this.steerOutput
+                .withPosition(velocities.angle.getRotations()));
+    }
+
+    @Override
+    public void refreshAll() {
+        BaseStatusSignal.refreshAll(
+                drivePosition,
+                driveVelocity,
+                steerPosition,
+                steerVelocity);
     }
 }

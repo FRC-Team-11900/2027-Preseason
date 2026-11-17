@@ -4,6 +4,7 @@ import org.wpilib.hardware.bus.CANPort;
 import org.wpilib.math.geometry.Rotation2d;
 import org.wpilib.units.measure.Angle;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -32,20 +33,26 @@ public class GyroIOPigeon implements GyroIO {
 
     @Override
     public Rotation2d getYaw() {
-        this.yaw.refresh();
         return new Rotation2d(this.yaw.getValue());
     }
 
     @Override
     public Rotation2d getPitch() {
-        this.pitch.refresh();
         return new Rotation2d(this.pitch.getValue());
     }
 
     @Override
     public Rotation2d getRoll() {
-        this.roll.refresh();
         return new Rotation2d(this.roll.getValue());
+    }
+
+    @Override
+    public void refreshAll() {
+        BaseStatusSignal.refreshAll(
+            this.yaw, 
+            this.pitch,
+            this.roll
+        );
     }
 
 

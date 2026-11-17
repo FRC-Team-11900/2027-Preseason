@@ -34,6 +34,13 @@ public class DriveCmd extends Command {
     }
 
     @Override
+    public void initialize() {
+        this.xLimiter.reset(0.0);
+        this.yLimiter.reset(0.0);
+        this.rotLimiter.reset(0.0);
+    }
+
+    @Override
     public void execute() {
 
         var xSpeed = -gamepad.getLeftY() * DriveConstant.MAX_VELOCITY.in(MetersPerSecond);
@@ -48,7 +55,7 @@ public class DriveCmd extends Command {
 
         drive.setFieldOrientedVelocities(velocities);
     }
-    
+
     @Override
     public boolean isFinished() {
         return false;

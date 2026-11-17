@@ -1,8 +1,14 @@
 package first.subsystems.drive;
 
+import static org.wpilib.units.Units.Amps;
+import static org.wpilib.units.Units.Kilogram;
+import static org.wpilib.units.Units.KilogramSquareMeters;
+
+import org.littletonrobotics.junction.Logger;
 import org.wpilib.command2.SubsystemBase;
 import org.wpilib.driverstation.Alliance;
 import org.wpilib.driverstation.MatchState;
+import org.wpilib.driverstation.RobotState;
 import org.wpilib.math.estimator.SwerveDrivePoseEstimator;
 import org.wpilib.math.geometry.Pose2d;
 import org.wpilib.math.geometry.Rotation2d;
@@ -10,11 +16,17 @@ import org.wpilib.math.kinematics.ChassisVelocities;
 import org.wpilib.math.kinematics.SwerveDriveKinematics;
 import org.wpilib.math.kinematics.SwerveModulePosition;
 import org.wpilib.math.kinematics.SwerveModuleVelocity;
+import org.wpilib.math.system.DCMotor;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.util.DriveFeedforwards;
+import com.pathplanner.lib.util.swerve.SwerveSetpoint;
+import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
+
 
 public class Drive extends SubsystemBase {
 
@@ -26,10 +38,19 @@ public class Drive extends SubsystemBase {
 
     private final SwerveDrivePoseEstimator poseEstimator;
 
+    private RobotConfig config;
+
+    private final SwerveSetpointGenerator setpointGenerator;
+    private SwerveSetpoint previousSetpoint;
+
     public Drive(ModuleIO[] modules, GyroIO gyro) {
 
         this.modules = modules;
         this.gyro = gyro;
+
+        this.refreshAll();
+
+        this.configureRobotConfig();
 
         this.kinematics = new SwerveDriveKinematics(DriveConstant.kModuleLocations);
         this.poseEstimator = new SwerveDrivePoseEstimator(
@@ -37,8 +58,23 @@ public class Drive extends SubsystemBase {
                 this.gyro.getYaw(),
                 this.getSwerveModulePositions(),
                 Pose2d.ZERO);
+
+        this.setpointGenerator = new SwerveSetpointGenerator(
+            this.config, 
+            (DCMotor.getFalcon500(1).freeSpeed / ModuleConfigs.constants.steerGearRatio()) * 0.98);
+        
+        this.previousSetpoint = new SwerveSetpoint(getRobotRelativeSpeeds(), getSwerveModuleVelocities(),
+                   DriveFeedforwards.zeros(config.numModules));
+        
         
         this.configurePathPlanner();
+    }
+
+    public void refreshAll() {
+        this.gyro.refreshAll();
+        for (int i = 0; i < modules.length; i++) {
+            this.modules[i].refreshAll();
+        }
     }
 
     public void resetHeading() {
@@ -54,15 +90,30 @@ public class Drive extends SubsystemBase {
         this.poseEstimator.resetPose(pose);
     }
 
-    public void configurePathPlanner() {
-        RobotConfig config;
+    public void configureRobotConfig() {
         try {
             config = RobotConfig.fromGUISettings();
         } catch (Exception e) {
-            config = null;
-            e.printStackTrace();
-            return; // won't be able to use pathplanner if we can't get the config.
+            var moduleConfig = new ModuleConfig(
+                ModuleConfigs.constants.wheelDiameter().div(2), 
+                DriveConstant.MAX_MODULE_SPEED, 
+                1.2, 
+                DCMotor.getFalcon500(1).withReduction(ModuleConfigs.constants.driveGearRatio()), 
+                Amps.of(60.0), 
+                1);
+                    
+
+            config = new RobotConfig(
+                Kilogram.of(40), 
+                KilogramSquareMeters.of(4.0), 
+                moduleConfig, 
+                DriveConstant.kModuleLocations);
+
+            System.err.println("Failed to load robot config from PP_GUI, using default config");
         }
+    }
+
+    public void configurePathPlanner() {        
 
         AutoBuilder.configure(
                 this::getPose,
@@ -72,7 +123,7 @@ public class Drive extends SubsystemBase {
                 new PPHolonomicDriveController(
                         new PIDConstants(5.0, 0.0, 0.0),
                         new PIDConstants(5.0, 0.0, 0.0)),
-                config, // The robot configuration
+                config,
                 () -> {
                     var alliance = MatchState.getAlliance();
                     if (alliance.isPresent()) {
@@ -112,15 +163,13 @@ public class Drive extends SubsystemBase {
     }
 
     public void setRobotRelativeVelocities(ChassisVelocities velocities) {
-        var descretizedVelocities = velocities.discretize(0.02);
+        this.previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, velocities, 0.02);
 
-        var moduleVelocities = this.kinematics.toSwerveModuleVelocities(descretizedVelocities);
+        Logger.recordOutput("Drive/TargetStates", this.previousSetpoint.moduleStates());
 
-        moduleVelocities = SwerveDriveKinematics.desaturateWheelVelocities(moduleVelocities,
-                DriveConstant.MAX_MODULE_SPEED);
 
         for (int i = 0; i < modules.length; i++) {
-            this.modules[i].setVelocities(moduleVelocities[i]);
+            this.modules[i].setVelocities(previousSetpoint.moduleStates()[i]);
         }
     }
 
@@ -134,6 +183,17 @@ public class Drive extends SubsystemBase {
 
     @Override
     public void periodic() {
+
+        this.refreshAll();
+
+        if (RobotState.isDisabled()) {
+            this.previousSetpoint = new SwerveSetpoint(getRobotRelativeSpeeds(), getSwerveModuleVelocities(),
+                   DriveFeedforwards.zeros(config.numModules));
+        }
+        
         this.poseEstimator.update(this.gyro.getYaw(), getSwerveModulePositions());
+
+        Logger.recordOutput("Drive/Pose", this.getPose());
+        Logger.recordOutput("Drive/ModuleVelocities", this.getSwerveModuleVelocities());
     }
 }

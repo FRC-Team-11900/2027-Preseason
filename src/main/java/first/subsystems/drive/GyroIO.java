@@ -12,4 +12,5 @@ public interface GyroIO {
 
     public Rotation2d getRoll();
 
+    public void refreshAll();
 }

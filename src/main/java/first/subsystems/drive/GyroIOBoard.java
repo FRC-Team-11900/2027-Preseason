@@ -34,4 +34,9 @@ public class GyroIOBoard implements GyroIO {
     public Rotation2d getRoll() {
         return new Rotation2d(this.gyro.getAngleX());
     }
+
+    @Override
+    public void refreshAll() {
+        return; // OnboardIMU does not require refreshing
+    }
 }
