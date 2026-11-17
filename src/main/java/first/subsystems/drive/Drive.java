@@ -27,6 +27,10 @@ import com.pathplanner.lib.util.DriveFeedforwards;
 import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
 
+import first.subsystems.drive.gyro.GyroIO;
+import first.subsystems.drive.module.ModuleConfigs;
+import first.subsystems.drive.module.ModuleIO;
+
 
 public class Drive extends SubsystemBase {
 

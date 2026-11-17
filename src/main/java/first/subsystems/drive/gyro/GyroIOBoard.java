@@ -1,4 +1,4 @@
-package first.subsystems.drive;
+package first.subsystems.drive.gyro;
 
 
 import org.wpilib.hardware.imu.OnboardIMU;

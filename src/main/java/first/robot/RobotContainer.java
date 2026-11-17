@@ -11,11 +11,10 @@ import org.wpilib.tunable.Tunables;
 
 import first.commands.DriveCmd;
 import first.subsystems.drive.Drive;
-import first.subsystems.drive.GyroIO;
-import first.subsystems.drive.GyroIOPigeon;
-import first.subsystems.drive.ModuleConfigs;
-import first.subsystems.drive.ModuleIO;
-import first.subsystems.drive.ModuleIOTalon;
+import first.subsystems.drive.gyro.GyroIO;
+import first.subsystems.drive.gyro.GyroIOPigeon;
+import first.subsystems.drive.module.ModuleIO;
+import first.subsystems.drive.module.ModuleIOTalon;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 
@@ -34,7 +33,7 @@ public class RobotContainer {
   public RobotContainer() {
 
     for (int i = 0; i < 4; i++) {
-      this.modules[i] = new ModuleIOTalon(ModuleConfigs.drivetrainIDs[i], ModuleConfigs.constants);
+      this.modules[i] = new ModuleIOTalon(i);
     }
 
     this.drive = new Drive(this.modules, this.gyro);

@@ -1,4 +1,4 @@
-package first.subsystems.drive;
+package first.subsystems.drive.module;
 
 import static org.wpilib.units.Units.Amps;
 import static org.wpilib.units.Units.Meters;
@@ -24,8 +24,8 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 
-import first.subsystems.drive.ModuleConfigs.ModuleConstants;
-import first.subsystems.drive.ModuleConfigs.ModuleIDs;
+import first.subsystems.drive.module.ModuleConfigs.ModuleConstants;
+import first.subsystems.drive.module.ModuleConfigs.ModuleIDs;
 
 public class ModuleIOTalon implements ModuleIO {
 
@@ -41,18 +41,15 @@ public class ModuleIOTalon implements ModuleIO {
 
     private final NeutralOut neutralOutput;
 
-    private final ModuleIDs IDs;
-    private final ModuleConstants constants;
+    private final String moduleName;
 
-    public ModuleIOTalon(ModuleIDs IDs, ModuleConstants constants) {
+    public ModuleIOTalon(int moduleIndex) {
 
-        this.IDs = IDs;
-        this.constants = constants;
+        this.moduleName = ModuleConfigs.drivetrainIDs[moduleIndex].moduleName();
+        this.driveMotor = new TalonFX(ModuleConfigs.drivetrainIDs[moduleIndex].driveMotorId(), ModuleConfigs.constants.canBus());
+        this.steerMotor = new TalonFX(ModuleConfigs.drivetrainIDs[moduleIndex].steerMotorId(), ModuleConfigs.constants.canBus());
 
-        this.driveMotor = new TalonFX(this.IDs.driveMotorId(), this.constants.canBus());
-        this.steerMotor = new TalonFX(this.IDs.steerMotorId(), this.constants.canBus());
-
-        this.absoluteEncoder = new CANcoder(IDs.absoluteEncoderId(), constants.canBus());
+        this.absoluteEncoder = new CANcoder(ModuleConfigs.drivetrainIDs[moduleIndex].absoluteEncoderId(), ModuleConfigs.constants.canBus());
 
         this.drivePosition = this.driveMotor.getPosition();
         this.steerPosition = this.steerMotor.getPosition();
@@ -85,7 +82,7 @@ public class ModuleIOTalon implements ModuleIO {
                 .withStatorCurrentLimitEnable(true)
                 .withSupplyCurrentLimitEnable(true);
         driveConfigs.Feedback
-                .withSensorToMechanismRatio(this.constants.driveGearRatio());
+                .withSensorToMechanismRatio(ModuleConfigs.constants.driveGearRatio());
         driveConfigs.Slot0
                 .withKP(1.0)
                 .withKI(0.0)
@@ -103,7 +100,7 @@ public class ModuleIOTalon implements ModuleIO {
                 .withStatorCurrentLimitEnable(true)
                 .withSupplyCurrentLimitEnable(true);
         steerConfigs.Feedback
-                .withSensorToMechanismRatio(this.constants.steerGearRatio());
+                .withSensorToMechanismRatio(ModuleConfigs.constants.steerGearRatio());
         steerConfigs.ClosedLoopGeneral
                 .withContinuousWrap(true);
         steerConfigs.Slot0
@@ -121,7 +118,7 @@ public class ModuleIOTalon implements ModuleIO {
         this.absolutePosition.waitForUpdate(0.25);
 
         if (!this.absolutePosition.getStatus().isOK()) {
-            System.err.println("[ERROR] " + this.IDs.moduleName() + " CANcoder refresh failed!");
+            System.err.println("[ERROR] " + this.moduleName + " CANcoder refresh failed!");
         } else {
             this.steerMotor.getConfigurator().setPosition(this.absolutePosition.getValue());
         }
@@ -129,13 +126,13 @@ public class ModuleIOTalon implements ModuleIO {
 
     @Override
     public Distance getDrivePosition() {
-        return Meters.of(this.drivePosition.getValueAsDouble() * this.constants.wheelDiameter().in(Meters) * Math.PI);
+        return Meters.of(this.drivePosition.getValueAsDouble() * ModuleConfigs.constants.wheelDiameter().in(Meters) * Math.PI);
     }
 
     @Override
     public LinearVelocity getDriveVelocity() {
         return MetersPerSecond
-                .of(this.driveVelocity.getValueAsDouble() * this.constants.wheelDiameter().in(Meters) * Math.PI);
+                .of(this.driveVelocity.getValueAsDouble() * ModuleConfigs.constants.wheelDiameter().in(Meters) * Math.PI);
     }
 
     @Override
@@ -172,7 +169,7 @@ public class ModuleIOTalon implements ModuleIO {
         }
 
         this.driveMotor.setControl(this.driveOutput
-                .withVelocity(velocities.velocity / (this.constants.wheelDiameter().in(Meters) * Math.PI)));
+                .withVelocity(velocities.velocity / (ModuleConfigs.constants.wheelDiameter().in(Meters) * Math.PI)));
         this.steerMotor.setControl(this.steerOutput
                 .withPosition(velocities.angle.getRotations()));
     }
